@@ -1,0 +1,70 @@
+services:
+  # 1. Base de Datos PostgreSQL 16 con Esquema y Datos de Prueba Iniciales
+  db:
+    image: postgres:16-alpine
+    container_name: gcmanager-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-gcmanager}
+      POSTGRES_USER: ${DB_USER:-gcadmin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gcpassword123}
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/02-seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    networks:
+      - gcmanager-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gcadmin} -d ${DB_NAME:-gcmanager}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. API Backend (Node.js + Express + Facturación ARCA)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gcmanager-api
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-gcmanager}
+      DB_USER: ${DB_USER:-gcadmin}
+      DB_PASSWORD: ${DB_PASSWORD:-gcpassword123}
+      JWT_SECRET: ${JWT_SECRET:-gcmanager_secret_token_jwt_2026}
+      DEFAULT_TENANT: kiosco-central
+    ports:
+      - "4020:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - gcmanager-net
+
+  # 3. Frontend Web SPA & Servidor Nginx (POS de Kiosco + Facturación + Admin)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gcmanager-web
+    restart: unless-stopped
+    ports:
+      - "3020:80"
+    depends_on:
+      - backend
+    networks:
+      - gcmanager-net
+
+networks:
+  gcmanager-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

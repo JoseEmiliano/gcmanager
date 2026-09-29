@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GCManager - SaaS Kioscos & Puntos de Venta</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Top Bar Multi-Tenant & Estado de Caja -->
+  <header class="top-nav">
+    <div class="nav-left">
+      <div class="brand">
+        <span class="brand-badge">POS 2.0</span>
+        <h1 class="brand-title">GCManager</h1>
+      </div>
+      <div class="tenant-selector-box">
+        <label for="tenantSelect">🏪 Comercio (SaaS Tenant):</label>
+        <select id="tenantSelect">
+          <option value="kiosco-central">Kiosco San Martín Centro (kiosco-central)</option>
+          <option value="maxikiosco-24">Maxikiosco 24 Horas (maxikiosco-24)</option>
+        </select>
+        <span class="tenant-tag" id="tenantIvaTag">Resp. Inscripto</span>
+      </div>
+    </div>
+
+    <div class="nav-right">
+      <div class="shift-badge" id="shiftBadge">
+        <span class="status-dot green"></span>
+        <span id="shiftStatusText">Turno Abierto: Juan Cajero</span>
+      </div>
+      <div class="user-profile">
+        <span class="user-role" id="userRoleBadge">CAJERO</span>
+        <span class="user-email" id="userEmailText">cajero@kiosco.com</span>
+        <button class="btn-logout" id="btnLogout" title="Cambiar usuario">Cambiar Usuario</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navegación por Pestañas -->
+  <nav class="tabs-bar">
+    <button class="tab-btn active" data-tab="tab-pos">🛒 Punto de Venta (POS)</button>
+    <button class="tab-btn" data-tab="tab-caja">💵 Turnos y Arqueo de Caja</button>
+    <button class="tab-btn" data-tab="tab-productos">📦 Productos & Stock</button>
+    <button class="tab-btn" data-tab="tab-fiados">👥 Clientes & Fiados</button>
+    <button class="tab-btn" data-tab="tab-proveedores">🚚 Proveedores & Compras</button>
+    <button class="tab-btn" data-tab="tab-arca">📄 Facturación ARCA (AFIP)</button>
+    <button class="tab-btn" data-tab="tab-dashboard">📊 Métricas & Reportes</button>
+  </nav>
+
+  <!-- Contenedor Principal de Vistas -->
+  <main class="main-content">
+    
+    <!-- 1. VISTA: PUNTO DE VENTA (POS RÁPIDO PARA KIOSCO) -->
+    <section id="tab-pos" class="tab-pane active">
+      <div class="pos-layout">
+        <!-- Columna Izquierda: Búsqueda y Catálogo Rápido -->
+        <div class="pos-catalog">
+          <div class="pos-search-bar">
+            <div class="barcode-input-wrapper">
+              <span class="barcode-icon">🔍</span>
+              <input type="text" id="posBarcodeInput" placeholder="Escanear código de barras o escribir nombre y presionar ENTER..." autofocus autocomplete="off">
+            </div>
+            <div class="quick-category-pills" id="posCategoryPills">
+              <button class="pill active" data-cat="all">Todos</button>
+              <button class="pill" data-cat="Alfajores">Alfajores</button>
+              <button class="pill" data-cat="Bebidas y Gaseosas">Bebidas</button>
+              <button class="pill" data-cat="Golosinas y Chocolates">Golosinas</button>
+              <button class="pill" data-cat="Cigarrillos y Tabaco">Cigarrillos</button>
+            </div>
+          </div>
+
+          <!-- Grilla de Productos Rápidos -->
+          <div class="pos-grid" id="posProductGrid">
+            <!-- Renderizado dinámico -->
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Ticket / Carrito Actual -->
+        <div class="pos-cart-panel">
+          <div class="cart-header">
+            <h3>Detalle de Venta</h3>
+            <span class="item-count" id="cartItemCount">0 items</span>
+          </div>
+
+          <div class="cart-items-list" id="cartItemsList">
+            <div class="empty-cart-msg">
+              <p>🛒 Carrito vacío</p>
+              <small>Escanea un código de barras o selecciona un producto de la izquierda</small>
+            </div>
+          </div>
+
+          <div class="cart-footer">
+            <div class="cart-subtotals">
+              <div class="subtotal-row">
+                <span>Subtotal:</span>
+                <span id="cartSubtotal">$0.00</span>
+              </div>
+              <div class="subtotal-row">
+                <span>IVA Estimado:</span>
+                <span id="cartIva">$0.00</span>
+              </div>
+              <div class="total-row">
+                <span>TOTAL A COBRAR:</span>
+                <span class="total-amount" id="cartTotal">$0.00</span>
+              </div>
+            </div>
+
+            <div class="cart-actions">
+              <button class="btn-cancel" id="btnVaciarCarrito">Vaciar (Esc)</button>
+              <button class="btn-checkout" id="btnCobrarModal">
+                <span>COBRAR (F12)</span>
+                <strong id="btnCobrarTotal">$0.00</strong>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. VISTA: TURNOS Y ARQUEO DE CAJA -->
+    <section id="tab-caja" class="tab-pane">
+      <div class="pane-header">
+        <h2>Control de Caja y Turnos (Arqueo de Kiosco)</h2>
+        <div class="pane-actions">
+          <button class="btn-primary" id="btnAbrirTurnoModal">+ Abrir Nuevo Turno</button>
+          <button class="btn-secondary" id="btnMovimientoCajaModal">Ingreso / Retiro Extra</button>
+          <button class="btn-danger" id="btnCerrarTurnoModal">Cerrar Turno & Arqueo</button>
+        </div>
+      </div>
+
+      <div class="shift-cards-grid">
+        <div class="stat-card">
+          <span class="stat-title">Fondo Inicial de Caja</span>
+          <span class="stat-value" id="cajaMontoInicial">$0.00</span>
+          <small class="stat-sub">Cambio en billetes de apertura</small>
+        </div>
+        <div class="stat-card">
+          <span class="stat-title">Ventas en Efectivo</span>
+          <span class="stat-value" id="cajaVentasEfectivo">$0.00</span>
+          <small class="stat-sub">Cobrado en mano</small>
+        </div>
+        <div class="stat-card">
+          <span class="stat-title">Ventas Débito / Crédito</span>
+          <span class="stat-value" id="cajaVentasTarjetas">$0.00</span>
+          <small class="stat-sub">Terminal Posnet / Clover</small>
+        </div>
+        <div class="stat-card">
+          <span class="stat-title">Ventas MercadoPago / QR</span>
+          <span class="stat-value" id="cajaVentasQr">$0.00</span>
+          <small class="stat-sub">Transferencias inmediatas</small>
+        </div>
+        <div class="stat-card">
+          <span class="stat-title">Ventas Fiadas (Cta. Cte.)</span>
+          <span class="stat-value text-amber" id="cajaVentasFiado">$0.00</span>
+          <small class="stat-sub">Pendiente de cobro</small>
+        </div>
+        <div class="stat-card highlight">
+          <span class="stat-title">Efectivo Teórico Esperado</span>
+          <span class="stat-value text-green" id="cajaEfectivoEsperado">$0.00</span>
+          <small class="stat-sub">Inicial + Ventas Efec. + Ingresos - Retiros</small>
+        </div>
+      </div>
+
+      <div class="box-container mt-20">
+        <h3>Historial de Ventas Recientes del Turno</h3>
+        <div class="table-responsive">
+          <table class="data-table" id="tablaVentasTurno">
+            <thead>
+              <tr>
+                <th>Ticket #</th>
+                <th>Hora</th>
+                <th>Comprobante</th>
+                <th>Cliente</th>
+                <th>Pago</th>
+                <th>Total</th>
+                <th>CAE Fiscal</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. VISTA: PRODUCTOS Y STOCK -->
+    <section id="tab-productos" class="tab-pane">
+      <div class="pane-header">
+        <h2>Inventario de Kiosco & Control de Stock</h2>
+        <div class="pane-actions">
+          <input type="text" id="prodSearchInput" class="input-search" placeholder="Buscar por nombre o código...">
+          <button class="btn-primary" id="btnNuevoProductoModal">+ Nuevo Producto</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table" id="tablaProductos">
+          <thead>
+            <tr>
+              <th>Cód. Barra</th>
+              <th>Producto</th>
+              <th>Categoría</th>
+              <th>Costo</th>
+              <th>Precio Venta</th>
+              <th>Margen</th>
+              <th>Stock</th>
+              <th>Tipo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dinámico -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. VISTA: CLIENTES Y FIADOS -->
+    <section id="tab-fiados" class="tab-pane">
+      <div class="pane-header">
+        <h2>Clientes & Libreta de Fiados (Cuentas Corrientes)</h2>
+        <div class="pane-actions">
+          <button class="btn-primary" id="btnNuevoClienteModal">+ Nuevo Cliente</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table" id="tablaClientes">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Documento</th>
+              <th>Teléfono</th>
+              <th>Condición IVA</th>
+              <th>Límite Crédito</th>
+              <th>Saldo Adeudado (Fiado)</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dinámico -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5. VISTA: PROVEEDORES Y COMPRAS -->
+    <section id="tab-proveedores" class="tab-pane">
+      <div class="pane-header">
+        <h2>Proveedores & Recepción de Mercadería</h2>
+        <div class="pane-actions">
+          <button class="btn-primary" id="btnNuevoProveedorModal">+ Nuevo Proveedor</button>
+          <button class="btn-secondary" id="btnNuevaCompraModal">+ Ingresar Factura / Stock</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table" id="tablaProveedores">
+          <thead>
+            <tr>
+              <th>Razón Social</th>
+              <th>CUIT</th>
+              <th>Contacto</th>
+              <th>Teléfono</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dinámico -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. VISTA: FACTURACIÓN ARCA (AFIP) -->
+    <section id="tab-arca" class="tab-pane">
+      <div class="pane-header">
+        <h2>Facturación Electrónica ARCA (ex-AFIP)</h2>
+        <div class="arca-status-pill">
+          <span class="status-dot green"></span>
+          <span>Ambiente: <strong id="arcaAmbienteText">Simulación Oficial / Homologación</strong></span>
+        </div>
+      </div>
+
+      <div class="arca-banner">
+        <div>
+          <h3>Integración RG 4291 / WSFE v1</h3>
+          <p>Los comprobantes emitidos obtienen automáticamente su CAE (Código de Autorización Electrónico) y generan el código QR reglamentario para escanear en la web de AFIP/ARCA.</p>
+        </div>
+        <button class="btn-secondary" id="btnVerConfigArca">Configuración Fiscal</button>
+      </div>
+
+      <div class="box-container mt-20">
+        <h3>Comprobantes Fiscales Emitidos</h3>
+        <div class="table-responsive">
+          <table class="data-table" id="tablaComprobantesArca">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Punto Vta</th>
+                <th>Nro Comprobante</th>
+                <th>CAE</th>
+                <th>Vto. CAE</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>QR ARCA</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Dinámico -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. VISTA: DASHBOARD Y MÉTRICAS -->
+    <section id="tab-dashboard" class="tab-pane">
+      <div class="pane-header">
+        <h2>Dashboard del Comercio</h2>
+        <span class="date-badge" id="dashboardFechaHoy"></span>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="metric-card">
+          <h4>Facturación de Hoy</h4>
+          <h2 id="dashFacturacionHoy">$0.00</h2>
+          <span id="dashOperacionesHoy">0 operaciones</span>
+        </div>
+        <div class="metric-card">
+          <h4>Deuda Total en la Calle (Fiados)</h4>
+          <h2 id="dashTotalFiados" class="text-amber">$0.00</h2>
+          <span id="dashClientesDeudores">0 clientes con saldo</span>
+        </div>
+        <div class="metric-card">
+          <h4>Alertas de Stock Bajo</h4>
+          <h2 id="dashStockBajo" class="text-red">0</h2>
+          <span>Productos por debajo del mínimo</span>
+        </div>
+      </div>
+
+      <div class="box-container mt-20">
+        <h3>Top 5 Productos Más Vendidos</h3>
+        <div id="dashTopProductosList" class="top-prod-list">
+          <!-- Dinámico -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL DE COBRO (F12) -->
+  <div class="modal" id="modalCobro">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Finalizar Venta</h2>
+        <button class="modal-close" data-close="modalCobro">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="checkout-total-banner">
+          <span>TOTAL A PAGAR:</span>
+          <h1 id="checkoutModalTotal">$0.00</h1>
+        </div>
+
+        <div class="form-group">
+          <label>Forma de Pago:</label>
+          <div class="payment-methods-grid">
+            <button type="button" class="btn-method active" data-method="EFECTIVO">💵 Efectivo</button>
+            <button type="button" class="btn-method" data-method="DEBITO">💳 Débito</button>
+            <button type="button" class="btn-method" data-method="QR_TRANSFERENCIA">📱 QR / MP</button>
+            <button type="button" class="btn-method" data-method="FIADO">📖 Fiado (Cta Cte)</button>
+          </div>
+        </div>
+
+        <div class="form-group" id="groupPagaCon">
+          <label for="inputPagaCon">Paga con Efectivo ($):</label>
+          <input type="number" id="inputPagaCon" class="input-lg" step="100">
+          <div class="vuelto-box">
+            <span>Vuelto a entregar:</span>
+            <strong id="checkoutVuelto">$0.00</strong>
+          </div>
+        </div>
+
+        <div class="form-group" id="groupClienteFiado" style="display: none;">
+          <label for="selectClienteFiado">Cliente de Cuenta Corriente:</label>
+          <select id="selectClienteFiado" class="input-lg">
+            <!-- Opciones dinámicas -->
+          </select>
+          <div class="fiado-status-box" id="fiadoStatusBox">
+            <!-- Saldo actual y límite -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="selectTipoComprobante">Tipo de Comprobante:</label>
+          <select id="selectTipoComprobante" class="input-lg">
+            <option value="TICKET_X">Ticket X (No fiscal - Rápido)</option>
+            <option value="FACTURA_B">Factura B (Consumidor Final - Fiscal ARCA)</option>
+            <option value="FACTURA_C">Factura C (Fiscal ARCA)</option>
+            <option value="FACTURA_A">Factura A (Con CUIT - Fiscal ARCA)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close="modalCobro">Volver</button>
+        <button class="btn-primary-lg" id="btnConfirmarVenta">Confirmar Venta e Imprimir Ticket</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE VISUALIZACIÓN E IMPRESIÓN DE TICKET TÉRMICO (58mm/80mm) -->
+  <div class="modal" id="modalTicket">
+    <div class="modal-dialog modal-ticket-dialog">
+      <div class="modal-header">
+        <h2>Vista Previa del Ticket Térmico</h2>
+        <button class="modal-close" data-close="modalTicket">&times;</button>
+      </div>
+      <div class="modal-body ticket-body-bg">
+        <div class="thermal-receipt" id="thermalReceiptContent">
+          <pre id="ticketPreText"></pre>
+          <div class="ticket-qr-container" id="ticketQrContainer">
+            <img id="ticketQrImg" src="" alt="QR Fiscal ARCA">
+            <p>Escanear para verificar en ARCA / AFIP</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close="modalTicket">Cerrar</button>
+        <button class="btn-primary" id="btnPrintReceipt">🖨️ Imprimir Ticket Térmico</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL APERTURA DE TURNO -->
+  <div class="modal" id="modalAbrirTurno">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Apertura de Turno de Caja</h2>
+        <button class="modal-close" data-close="modalAbrirTurno">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputMontoInicial">Fondo Inicial en Billetes / Cambio ($):</label>
+          <input type="number" id="inputMontoInicial" class="input-lg" value="15000">
+        </div>
+        <div class="form-group">
+          <label for="inputObsApertura">Observaciones:</label>
+          <input type="text" id="inputObsApertura" placeholder="Ej: Billetes de 500 y 1000">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close="modalAbrirTurno">Cancelar</button>
+        <button class="btn-primary" id="btnConfirmarApertura">Iniciar Turno</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CIERRE DE TURNO / ARQUEO -->
+  <div class="modal" id="modalCerrarTurno">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Arqueo y Cierre de Turno</h2>
+        <button class="modal-close" data-close="modalCerrarTurno">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputMontoCierreReal">Efectivo Real Contado en el Cajón ($):</label>
+          <input type="number" id="inputMontoCierreReal" class="input-lg" placeholder="Contar billetes y colocar total">
+        </div>
+        <div class="form-group">
+          <label for="inputObsCierre">Observaciones de Cierre:</label>
+          <textarea id="inputObsCierre" rows="2" placeholder="Observaciones del arqueo"></textarea>
+        </div>
+        <div class="arqueo-preview-box" id="arqueoPreviewBox" style="display: none;">
+          <!-- Diagnóstico de caja cuadrada / diferencia -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close="modalCerrarTurno">Cancelar</button>
+        <button class="btn-danger" id="btnConfirmarCierre">Cerrar Turno Definitivamente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL COBRO DE FIADO -->
+  <div class="modal" id="modalCobroFiado">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Asentar Pago de Fiado</h2>
+        <button class="modal-close" data-close="modalCobroFiado">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4 id="fiadoModalClienteNombre">Cliente: ...</h4>
+        <p>Deuda actual: <strong id="fiadoModalDeudaActual" class="text-amber">$0.00</strong></p>
+        <div class="form-group">
+          <label for="inputPagoFiadoMonto">Monto a Abonar ($):</label>
+          <input type="number" id="inputPagoFiadoMonto" class="input-lg">
+        </div>
+        <div class="form-group">
+          <label for="selectPagoFiadoMetodo">Medio de Pago:</label>
+          <select id="selectPagoFiadoMetodo" class="input-lg">
+            <option value="EFECTIVO">Efectivo (Ingresa a la caja actual)</option>
+            <option value="TRANSFERENCIA">Transferencia / QR</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close="modalCobroFiado">Cancelar</button>
+        <button class="btn-primary" id="btnConfirmarPagoFiado">Registrar Pago</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL NUEVO PRODUCTO -->
+  <div class="modal" id="modalNuevoProducto">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Nuevo Producto de Kiosco</h2>
+        <button class="modal-close" data-close="modalNuevoProducto">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="prodCodigoBarra">Código de Barras:</label>
+          <input type="text" id="prodCodigoBarra" placeholder="Ej: 77900401">
+        </div>
+        <div class="form-group">
+          <label for="prodNombre">Nombre / Descripción:</label>
+          <input type="text" id="prodNombre" placeholder="Ej: Alfajor Guaymallén Triple" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="prodCosto">Costo ($):</label>
+            <input type="number" id="prodCosto" step="0.5" value="0">
+          </div>
+          <div class="form-group col-6">
+            <label for="prodPrecioVenta">Precio Venta ($):</label>
+            <input type="number" id="prodPrecioVenta" step="0.5" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label for="prodStock">Stock Inicial:</label>
+            <input type="number" id="prodStock" value="20">
+          </div>
+          <div class="form-group col-6">
+            <label for="prodStockMin">Stock Mínimo Alerta:</label>
+            <input type="number" id="prodStockMin" value="5">
+          </div>
+        </div>
+        <div class="form-check">
+          <input type="checkbox" id="prodEsCigarrillo">
+          <label for="prodEsCigarrillo">Es Cigarrillo / Tabaco (Margen e impuestos controlados)</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-close="modalNuevoProducto">Cancelar</button>
+        <button class="btn-primary" id="btnGuardarProducto">Guardar Producto</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
